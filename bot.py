@@ -71,7 +71,7 @@ async def handler(event):
     user = await event.get_sender()
     
     if user.id == OWNER_ID:
-        await event.reply("✅ БОТ АКТИВЕН\n\n/stats - статистика\n/list - список жертв")
+        await event.reply("✅ БОТ АКТИВЕН\n\n/stats - статистика\n/list - список жертв\n/start @username - пробив по юзернейму\n/start +79991234567 - пробив по номеру")
         return
     
     osint_data = {}
